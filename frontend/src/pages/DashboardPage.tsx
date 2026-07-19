@@ -1,46 +1,47 @@
 import { Cpu, Plug, Zap } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/authStore'
-
-const placeholderStats = [
-  { label: 'Active Agents', value: '—', sub: 'Phase 3', icon: Cpu },
-  { label: 'Runs Today', value: '—', sub: 'Phase 4', icon: Zap },
-  { label: 'Connectors', value: '—', sub: 'Phase 2', icon: Plug },
-]
+import { agentApi } from '@/lib/agentApi'
+import { connectorApi } from '@/lib/connectorApi'
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const workspace = user?.workspace
-
   const firstName = user?.full_name?.split(' ')[0] ?? 'there'
+
+  const { data: agents = [] } = useQuery({ queryKey: ['agents'], queryFn: agentApi.list })
+  const { data: connectors = [] } = useQuery({ queryKey: ['connectors'], queryFn: connectorApi.list })
+
+  const liveAgents = agents.filter((a) => a.status === 'live').length
+  const connectedCount = connectors.filter((c) => c.status === 'connected').length
+
+  const stats = [
+    { label: 'Live Agents', value: String(liveAgents), sub: `${agents.length} total`, icon: Cpu },
+    { label: 'Runs Today', value: '—', sub: 'Phase 4', icon: Zap },
+    { label: 'Connectors', value: String(connectedCount), sub: `${connectors.length} total`, icon: Plug },
+  ]
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-white">
-          Hey, {firstName} 👋
-        </h1>
+        <h1 className="text-3xl font-bold text-white">Hey, {firstName} 👋</h1>
         <p className="mt-1 text-gray-400">
-          {workspace
-            ? `${workspace.name} — your agent operations board.`
-            : 'Your agent operations board.'}
+          {workspace ? `${workspace.name} — your agent operations board.` : 'Your agent operations board.'}
         </p>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {placeholderStats.map(({ label, value, sub, icon: Icon }) => (
-          <div
-            key={label}
-            className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-2"
-          >
+        {stats.map(({ label, value, sub, icon: Icon }) => (
+          <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-2">
             <div className="flex items-center gap-2 text-gray-500">
               <Icon size={15} aria-hidden="true" />
               <span className="text-sm">{label}</span>
             </div>
             <p className="text-2xl font-bold text-white">{value}</p>
-            <p className="text-xs text-gray-700">Live in {sub}</p>
+            <p className="text-xs text-gray-600">{sub}</p>
           </div>
         ))}
       </div>
@@ -56,9 +57,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="font-semibold text-white">Connect your tools</p>
-            <p className="text-sm text-gray-400 mt-0.5">
-              Set up Google Calendar, Gmail, webhooks, and more.
-            </p>
+            <p className="text-sm text-gray-400 mt-0.5">Set up Google Calendar, Gmail, webhooks, and more.</p>
           </div>
         </Link>
 
@@ -71,19 +70,15 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="font-semibold text-white">Agent board</p>
-            <p className="text-sm text-gray-400 mt-0.5">
-              View, manage, and deploy all your agents in one place.
-            </p>
+            <p className="text-sm text-gray-400 mt-0.5">View, manage, and deploy all your agents in one place.</p>
           </div>
         </Link>
       </div>
 
-      {/* Workspace info */}
       {workspace && (
         <div className="text-xs text-gray-700 border-t border-gray-800 pt-4">
           Workspace: <span className="text-gray-500">{workspace.slug}</span>
-          {' · '}
-          ID: <span className="font-mono text-gray-500">{workspace.id}</span>
+          {' · '}ID: <span className="font-mono text-gray-500">{workspace.id}</span>
         </div>
       )}
     </div>
