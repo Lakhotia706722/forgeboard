@@ -24,7 +24,7 @@ export default function BoardPage() {
     queryFn: connectorApi.list,
   })
 
-  function handleCreated(agent: AgentOut) {
+  function upsertAgent(agent: AgentOut) {
     queryClient.setQueryData<AgentOut[]>(['agents'], (prev) => {
       if (!prev) return [agent]
       const idx = prev.findIndex((a) => a.id === agent.id)
@@ -67,8 +67,7 @@ export default function BoardPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Agents</h1>
           <p className="mt-1 text-sm text-gray-400">
-            Build, configure, and deploy your AI agents.
-            {' '}
+            Build, configure, and deploy your AI agents.{' '}
             <span className="text-gray-600">Kanban view coming in Phase 5.</span>
           </p>
         </div>
@@ -111,25 +110,16 @@ export default function BoardPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-800 bg-gray-900/80">
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Agent
-                </th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trigger
-                </th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Connectors
-                </th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">
-                  Runs
-                </th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">
-                  Cost
-                </th>
-                <th className="px-4 py-3" />
+                {['Agent', 'Status', 'Trigger', 'Connectors', 'Runs', 'Cost', ''].map((h) => (
+                  <th
+                    key={h}
+                    className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider${
+                      h === 'Runs' || h === 'Cost' ? ' text-right' : ''
+                    }`}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -139,6 +129,7 @@ export default function BoardPage() {
                   agent={agent}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onUpdated={upsertAgent}
                 />
               ))}
             </tbody>
@@ -151,7 +142,7 @@ export default function BoardPage() {
         <AgentBuilderModal
           connectors={connectors}
           onClose={handleCloseBuilder}
-          onCreated={handleCreated}
+          onCreated={upsertAgent}
           editAgent={editingAgent}
         />
       )}

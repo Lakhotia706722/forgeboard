@@ -19,6 +19,7 @@ passlib==1.7.4
 # Celery / Redis
 celery==5.4.0
 redis==5.0.4
+croniter==2.0.5
 
 # Anthropic
 anthropic==0.25.9

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/authStore'
 import { agentApi } from '@/lib/agentApi'
 import { connectorApi } from '@/lib/connectorApi'
+import { runApi } from '@/lib/runApi'
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
@@ -12,13 +13,21 @@ export default function DashboardPage() {
 
   const { data: agents = [] } = useQuery({ queryKey: ['agents'], queryFn: agentApi.list })
   const { data: connectors = [] } = useQuery({ queryKey: ['connectors'], queryFn: connectorApi.list })
+  const { data: allRuns = [] } = useQuery({ queryKey: ['runs'], queryFn: () => runApi.listAll(200) })
 
   const liveAgents = agents.filter((a) => a.status === 'live').length
   const connectedCount = connectors.filter((c) => c.status === 'connected').length
+  const todayRuns = allRuns.filter((r) => {
+    const d = new Date(r.created_at)
+    const now = new Date()
+    return d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+  }).length
 
   const stats = [
     { label: 'Live Agents', value: String(liveAgents), sub: `${agents.length} total`, icon: Cpu },
-    { label: 'Runs Today', value: '—', sub: 'Phase 4', icon: Zap },
+    { label: 'Runs Today', value: String(todayRuns), sub: `${allRuns.length} all-time`, icon: Zap },
     { label: 'Connectors', value: String(connectedCount), sub: `${connectors.length} total`, icon: Plug },
   ]
 
