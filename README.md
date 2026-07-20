@@ -148,12 +148,98 @@ forgeboard/
 |---|---|---|
 | 0 | Project scaffolding | ✅ Complete |
 | 1 | Auth & workspace | ✅ Complete |
-| 2 | Connector layer | — |
-| 3 | Agent builder | — |
-| 4 | Orchestration engine | — |
-| 5 | Kanban operations board | — |
-| 6 | Governance basics | — |
-| 7 | Polish & demo readiness | — |
+| 2 | Connector layer | ✅ Complete |
+| 3 | Agent builder | ✅ Complete |
+| 4 | Orchestration engine | ✅ Complete |
+| 5 | Kanban operations board | ✅ Complete |
+| 6 | Governance basics | ✅ Complete |
+| 7 | Polish & demo readiness | ✅ Complete |
+
+---
+
+## Seed demo data
+
+Creates a demo account with 3 pre-built agent templates so a new user has something to click immediately:
+
+```bash
+cd backend
+python scripts/seed_demo.py
+# Email:    demo@forgeboard.dev
+# Password: Demo1234!
+```
+
+---
+
+## Deployment (Render / Railway)
+
+### Required environment variables
+
+Set these on your host (copy from `.env.example`):
+
+| Key | How to generate |
+|---|---|
+| `SECRET_KEY` | `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `JWT_SECRET_KEY` | Same as above, different value |
+| `FERNET_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `ANTHROPIC_API_KEY` | From console.anthropic.com |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | From Google Cloud Console → OAuth 2.0 |
+| `GOOGLE_REDIRECT_URI` | `https://your-domain/api/v1/connectors/oauth/google/callback` |
+| `DATABASE_URL` | Postgres connection string (`postgresql+asyncpg://…`) |
+| `REDIS_URL` / `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | Redis connection strings |
+| `CORS_ORIGINS` | `["https://your-frontend-domain.com"]` |
+
+### Services to run
+
+| Service | Start command (from `/backend`) |
+|---|---|
+| API | `uvicorn app.main:app --host 0.0.0.0 --port 8000` |
+| Worker | `celery -A app.workers.celery_app worker --loglevel=info` |
+| Beat | `celery -A app.workers.celery_app beat --loglevel=info` |
+| Frontend | `npm run build` → serve `dist/` via nginx or CDN |
+
+### Run migrations on every deploy
+
+```bash
+cd backend && alembic upgrade head
+```
+
+### Render `render.yaml` quickstart
+
+```yaml
+services:
+  - type: web
+    name: forgeboard-api
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - fromGroup: forgeboard-secrets
+
+  - type: worker
+    name: forgeboard-worker
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.workers.celery_app worker --loglevel=info
+    envVars:
+      - fromGroup: forgeboard-secrets
+
+  - type: worker
+    name: forgeboard-beat
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.workers.celery_app beat --loglevel=info
+    envVars:
+      - fromGroup: forgeboard-secrets
+
+  - type: static
+    name: forgeboard-frontend
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+```
 
 ---
 

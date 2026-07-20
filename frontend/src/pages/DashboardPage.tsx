@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore'
 import { agentApi } from '@/lib/agentApi'
 import { connectorApi } from '@/lib/connectorApi'
 import { runApi } from '@/lib/runApi'
+import OnboardingBanner from '@/components/onboarding/OnboardingBanner'
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
@@ -20,9 +21,11 @@ export default function DashboardPage() {
   const todayRuns = allRuns.filter((r) => {
     const d = new Date(r.created_at)
     const now = new Date()
-    return d.getFullYear() === now.getFullYear() &&
+    return (
+      d.getFullYear() === now.getFullYear() &&
       d.getMonth() === now.getMonth() &&
       d.getDate() === now.getDate()
+    )
   }).length
 
   const stats = [
@@ -31,15 +34,23 @@ export default function DashboardPage() {
     { label: 'Connectors', value: String(connectedCount), sub: `${connectors.length} total`, icon: Plug },
   ]
 
+  // Show onboarding if no connectors and no agents yet
+  const showOnboarding = connectors.length === 0 && agents.length === 0
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-white">Hey, {firstName} 👋</h1>
         <p className="mt-1 text-gray-400">
-          {workspace ? `${workspace.name} — your agent operations board.` : 'Your agent operations board.'}
+          {workspace
+            ? `${workspace.name} — your agent operations board.`
+            : 'Your agent operations board.'}
         </p>
       </div>
+
+      {/* First-login onboarding */}
+      {showOnboarding && <OnboardingBanner />}
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -66,7 +77,9 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="font-semibold text-white">Connect your tools</p>
-            <p className="text-sm text-gray-400 mt-0.5">Set up Google Calendar, Gmail, webhooks, and more.</p>
+            <p className="text-sm text-gray-400 mt-0.5">
+              Set up Google Calendar, Gmail, webhooks, and more.
+            </p>
           </div>
         </Link>
 
@@ -79,15 +92,19 @@ export default function DashboardPage() {
           </div>
           <div>
             <p className="font-semibold text-white">Agent board</p>
-            <p className="text-sm text-gray-400 mt-0.5">View, manage, and deploy all your agents in one place.</p>
+            <p className="text-sm text-gray-400 mt-0.5">
+              View, manage, and deploy all your agents in one place.
+            </p>
           </div>
         </Link>
       </div>
 
       {workspace && (
         <div className="text-xs text-gray-700 border-t border-gray-800 pt-4">
-          Workspace: <span className="text-gray-500">{workspace.slug}</span>
-          {' · '}ID: <span className="font-mono text-gray-500">{workspace.id}</span>
+          Workspace:{' '}
+          <span className="text-gray-500">{workspace.slug}</span>
+          {' · '}
+          ID: <span className="font-mono text-gray-500">{workspace.id}</span>
         </div>
       )}
     </div>
