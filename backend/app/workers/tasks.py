@@ -29,6 +29,7 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.encryption import decrypt_json
 from app.models.agent import Agent, AgentStatus
+from app.models.audit import AuditLogEntry
 from app.models.connector import Connector
 from app.models.kv_store import KvEntry
 from app.models.run import AgentRun, RunStatus
@@ -104,7 +105,41 @@ async def _run_agent_async(agent_id: str, run_id: str, celery_task_id: str) -> d
         run.started_at = datetime.now(timezone.utc)
         await db.commit()
 
-        # ── Check workspace concurrency cap ───────────────────────────────────
+        # ── Check workspace spend cap ─────────────────────────────────────────
+        from sqlalchemy import func as sqlfunc
+        from app.models.user import Workspace
+        ws_result = await db.execute(
+            select(Workspace).where(Workspace.id == run.workspace_id)
+        )
+        workspace = ws_result.scalar_one_or_none()
+        if workspace:
+            total_spent_result = await db.execute(
+                select(sqlfunc.sum(AgentRun.cost_usd_cents)).where(
+                    AgentRun.workspace_id == run.workspace_id,
+                    AgentRun.status == RunStatus.SUCCESS,
+                )
+            )
+            total_spent = total_spent_result.scalar() or 0
+            if total_spent >= workspace.spend_cap_usd_cents:
+                await _fail_run(
+                    run,
+                    f"Workspace spend cap of ${workspace.spend_cap_usd_cents / 100:.2f} reached. "
+                    "All agents auto-paused. Adjust your cap in workspace settings.",
+                    db,
+                )
+                # Auto-pause all live agents in this workspace
+                from app.models.agent import AgentStatus as AS
+                live_agents_result = await db.execute(
+                    select(Agent).where(
+                        Agent.workspace_id == run.workspace_id,
+                        Agent.status == AS.LIVE,
+                    )
+                )
+                for live_agent in live_agents_result.scalars().all():
+                    live_agent.status = AS.PAUSED
+                await db.commit()
+                return {"error": "Spend cap reached"}
+
         from sqlalchemy import func
         concurrent = await db.execute(
             select(func.count()).where(
@@ -264,6 +299,19 @@ async def _run_agent_async(agent_id: str, run_id: str, celery_task_id: str) -> d
                         timestamp=_now_iso(),
                         data={"tool": tool_name, "result": result},
                     ))
+
+                    # ── Write audit log entry ─────────────────────────────────
+                    audit_entry = AuditLogEntry(
+                        workspace_id=run.workspace_id,
+                        agent_id=run.agent_id,
+                        run_id=run.id,
+                        agent_name=agent.name,
+                        tool_name=tool_name,
+                        tool_input_json=json.dumps(tool_input),
+                        tool_result_json=json.dumps(result),
+                        outcome="error" if "error" in result else "success",
+                    )
+                    db.add(audit_entry)
 
                     tool_results.append({
                         "type": "tool_result",

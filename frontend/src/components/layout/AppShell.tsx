@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Cpu, LayoutDashboard, LogOut, Plug } from 'lucide-react'
+import { Cpu, LayoutDashboard, LogOut, Plug, Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { useAuthStore } from '@/store/authStore'
@@ -14,6 +14,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/board', label: 'Agents', icon: Cpu },
   { to: '/connectors', label: 'Connectors', icon: Plug },
+  { to: '/governance', label: 'Governance', icon: Shield },
 ]
 
 export default function AppShell({ children }: AppShellProps) {
