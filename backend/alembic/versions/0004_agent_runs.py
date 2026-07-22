@@ -17,11 +17,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "CREATE TYPE runstatus AS ENUM "
-        "('pending', 'running', 'success', 'failed', 'cancelled')"
-    )
-
     op.create_table(
         "agent_runs",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
@@ -41,7 +36,7 @@ def upgrade() -> None:
             "status",
             sa.Enum(
                 "pending", "running", "success", "failed", "cancelled",
-                name="runstatus", create_type=False,
+                name="runstatus",
             ),
             nullable=False,
             server_default="pending",

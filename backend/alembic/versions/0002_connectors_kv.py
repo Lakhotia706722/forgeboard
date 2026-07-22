@@ -17,16 +17,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Enums
-    op.execute(
-        "CREATE TYPE connectortype AS ENUM "
-        "('http_webhook', 'google_calendar', 'gmail', 'kv_store')"
-    )
-    op.execute(
-        "CREATE TYPE connectorstatus AS ENUM "
-        "('connected', 'disconnected', 'error', 'pending_auth')"
-    )
-
     op.create_table(
         "connectors",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
@@ -41,7 +31,7 @@ def upgrade() -> None:
             "connector_type",
             sa.Enum(
                 "http_webhook", "google_calendar", "gmail", "kv_store",
-                name="connectortype", create_type=False
+                name="connectortype"
             ),
             nullable=False,
         ),
@@ -49,7 +39,7 @@ def upgrade() -> None:
             "status",
             sa.Enum(
                 "connected", "disconnected", "error", "pending_auth",
-                name="connectorstatus", create_type=False
+                name="connectorstatus"
             ),
             nullable=False,
             server_default="disconnected",

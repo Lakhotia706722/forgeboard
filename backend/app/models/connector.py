@@ -48,10 +48,10 @@ class Connector(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     connector_type: Mapped[ConnectorType] = mapped_column(
-        SAEnum(ConnectorType, name="connectortype"), nullable=False
+        SAEnum(ConnectorType, name="connectortype", values_callable=lambda x: [e.value for e in x]), nullable=False
     )
     status: Mapped[ConnectorStatus] = mapped_column(
-        SAEnum(ConnectorStatus, name="connectorstatus"),
+        SAEnum(ConnectorStatus, name="connectorstatus", values_callable=lambda x: [e.value for e in x]),
         default=ConnectorStatus.DISCONNECTED,
         nullable=False,
     )

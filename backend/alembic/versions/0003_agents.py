@@ -17,15 +17,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "CREATE TYPE agentstatus AS ENUM "
-        "('draft', 'testing', 'live', 'paused', 'needs_review')"
-    )
-    op.execute(
-        "CREATE TYPE triggertype AS ENUM "
-        "('manual', 'scheduled', 'webhook')"
-    )
-
     op.create_table(
         "agents",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
@@ -41,7 +32,7 @@ def upgrade() -> None:
             "status",
             sa.Enum(
                 "draft", "testing", "live", "paused", "needs_review",
-                name="agentstatus", create_type=False,
+                name="agentstatus",
             ),
             nullable=False,
             server_default="draft",
@@ -50,7 +41,7 @@ def upgrade() -> None:
             "trigger_type",
             sa.Enum(
                 "manual", "scheduled", "webhook",
-                name="triggertype", create_type=False,
+                name="triggertype",
             ),
             nullable=False,
             server_default="manual",

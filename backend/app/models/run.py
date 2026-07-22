@@ -48,7 +48,7 @@ class AgentRun(Base):
     )
 
     status: Mapped[RunStatus] = mapped_column(
-        SAEnum(RunStatus, name="runstatus"),
+        SAEnum(RunStatus, name="runstatus", values_callable=lambda x: [e.value for e in x]),
         default=RunStatus.PENDING,
         nullable=False,
         index=True,

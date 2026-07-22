@@ -55,13 +55,13 @@ class Agent(Base):
     goal: Mapped[str] = mapped_column(Text, nullable=False)
 
     status: Mapped[AgentStatus] = mapped_column(
-        SAEnum(AgentStatus, name="agentstatus"),
+        SAEnum(AgentStatus, name="agentstatus", values_callable=lambda x: [e.value for e in x]),
         default=AgentStatus.DRAFT,
         nullable=False,
         index=True,
     )
     trigger_type: Mapped[TriggerType] = mapped_column(
-        SAEnum(TriggerType, name="triggertype"),
+        SAEnum(TriggerType, name="triggertype", values_callable=lambda x: [e.value for e in x]),
         default=TriggerType.MANUAL,
         nullable=False,
     )
