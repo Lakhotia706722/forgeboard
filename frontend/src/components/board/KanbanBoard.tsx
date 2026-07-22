@@ -9,7 +9,6 @@ import {
   type DragEndEvent,
   type DragOverEvent,
 } from '@dnd-kit/core'
-import { arrayMove } from '@dnd-kit/sortable'
 import toast from 'react-hot-toast'
 
 import { agentApi, type AgentOut, type AgentStatus } from '@/lib/agentApi'
@@ -67,7 +66,7 @@ export default function KanbanBoard({
   }
 
   const handleDragEnd = useCallback(
-    async ({ active, over }: DragEndEvent) => {
+    async ({ over }: DragEndEvent) => {
       setActiveAgent(null)
       setOverLaneId(null)
 
@@ -84,7 +83,7 @@ export default function KanbanBoard({
         targetLane = hoveredAgent.status
       }
 
-      if (targetLane === activeAgent.status) return // same lane, no-op
+      if (targetLane === activeAgent.status) return
 
       // Optimistic update
       const optimistic = agents.map((a) =>

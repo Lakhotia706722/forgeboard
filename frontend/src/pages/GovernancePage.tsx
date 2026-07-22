@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Download, Shield, DollarSign, AlertTriangle, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-import { governanceApi, type AuditEntry } from '@/lib/governanceApi'
+import { governanceApi } from '@/lib/governanceApi'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { cn } from '@/lib/utils'

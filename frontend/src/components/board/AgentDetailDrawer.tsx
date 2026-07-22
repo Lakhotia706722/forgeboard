@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { X, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AgentOut, AgentStatus } from '@/lib/agentApi'
-import { LANES, LANE_MAP } from './boardConfig'
+import { LANE_MAP } from './boardConfig'
 import Button from '@/components/ui/Button'
 import AgentRunsPanel from '@/components/runs/AgentRunsPanel'
 

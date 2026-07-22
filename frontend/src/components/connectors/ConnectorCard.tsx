@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, Globe, Mail, Calendar, Database, Trash2, RefreshCw } from 'lucide-react'
+import { Globe, Mail, Calendar, Database, Trash2, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 import type { ConnectorOut, ConnectorType } from '@/lib/connectorApi'
