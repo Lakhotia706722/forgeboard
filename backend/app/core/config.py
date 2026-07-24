@@ -45,5 +45,24 @@ class Settings(BaseSettings):
     # Concurrency
     MAX_CONCURRENT_RUNS_PER_WORKSPACE: int = 5
 
+    # ── Phase 8: Voice & Telephony ────────────────────────────────────────────
+    # Twilio
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""          # E.164 e.g. +15551234567
+    TWILIO_WEBHOOK_BASE_URL: str = ""      # Public URL Twilio posts to (ngrok in dev)
+
+    # STT provider — "deepgram" (default) | pluggable via interface
+    STT_PROVIDER: str = "deepgram"
+    DEEPGRAM_API_KEY: str = ""
+
+    # TTS provider — "elevenlabs" (default) | pluggable via interface
+    TTS_PROVIDER: str = "elevenlabs"
+    ELEVENLABS_API_KEY: str = ""
+    ELEVENLABS_VOICE_ID: str = "21m00Tcm4TlvDq8ikWAM"  # default "Rachel" voice
+
+    # Max concurrent calls per workspace (separate from agent run cap)
+    MAX_CONCURRENT_CALLS_PER_WORKSPACE: int = 3
+
 
 settings = Settings()
