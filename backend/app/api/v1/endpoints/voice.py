@@ -12,8 +12,9 @@ Voice agent endpoints:
   GET    /voice/calls                         — list all calls in workspace
   GET    /voice/calls/{call_log_id}           — get call log with transcript
 
-  Twilio webhooks (no auth — validated by Twilio signature):
-  POST   /voice/answer/{call_log_id}          — Twilio calls this when call is answered
+  Twilio webhooks (no JWT auth — validated by Twilio request signature):
+  POST   /voice/inbound/{voice_agent_id}      — Twilio calls this for inbound calls
+  POST   /voice/answer/{call_log_id}          — Twilio calls this when outbound call is answered
   POST   /voice/status                        — Twilio call status callbacks
 
   WebSocket:
@@ -25,7 +26,7 @@ from typing import Optional
 from fastapi import APIRouter, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import PlainTextResponse
 
-from app.api.deps import CurrentWorkspace, DB
+from app.api.deps import CurrentWorkspace, DB, TwilioWebhook
 from app.core.database import AsyncSessionLocal
 from app.schemas.voice import (
     CallLogOut,
@@ -139,48 +140,101 @@ async def get_call(
 # Twilio webhooks — no JWT auth, validated by Twilio request signature
 # ---------------------------------------------------------------------------
 
-@router.post("/answer/{call_log_id}")
-async def twilio_answer(call_log_id: uuid.UUID, request: Request):
+@router.post("/inbound/{voice_agent_id}")
+async def twilio_inbound(
+    voice_agent_id: uuid.UUID,
+    request: Request,
+    _sig: TwilioWebhook,
+):
     """
-    Twilio POSTs here when a call is answered (inbound or outbound).
-    Returns TwiML to start the bidirectional media stream.
+    Twilio POSTs here when an inbound call arrives on a number associated
+    with this voice agent.
 
-    Production note: validate X-Twilio-Signature before processing.
-    See: https://www.twilio.com/docs/usage/webhooks/webhooks-security
+    Configure this URL in the Twilio console under your phone number's
+    "A call comes in" webhook:
+        POST https://{TWILIO_WEBHOOK_BASE_URL}/api/v1/voice/inbound/{voice_agent_id}
+
+    Returns TwiML that opens a bidirectional media stream to our WebSocket
+    endpoint so the call engine can drive the conversation.
     """
     form = await request.form()
     call_sid = form.get("CallSid", "")
     from_number = form.get("From", "")
     to_number = form.get("To", "")
 
-    # For inbound calls routed to a specific voice agent, the voice_agent_id
-    # is embedded in the webhook URL path. For outbound, CallLog already exists.
+    async with AsyncSessionLocal() as db:
+        # Resolve workspace_id from the voice agent record — the inbound
+        # webhook carries no auth token, so we look it up by voice_agent_id.
+        from sqlalchemy import select
+        from app.models.voice_agent import VoiceAgent
+
+        r = await db.execute(
+            select(VoiceAgent).where(VoiceAgent.id == voice_agent_id)
+        )
+        va = r.scalar_one_or_none()
+        if not va:
+            from twilio.twiml.voice_response import VoiceResponse
+            vr = VoiceResponse()
+            vr.say("This number is not configured. Goodbye.")
+            vr.hangup()
+            return PlainTextResponse(content=str(vr), media_type="application/xml")
+
+        _call_log, twiml = await voice_service.handle_inbound_call(
+            voice_agent_id=voice_agent_id,
+            workspace_id=va.workspace_id,
+            call_sid=call_sid,
+            from_number=from_number,
+            to_number=to_number,
+            db=db,
+        )
+
+    return PlainTextResponse(content=twiml, media_type="application/xml")
+
+
+@router.post("/answer/{call_log_id}")
+async def twilio_answer(
+    call_log_id: uuid.UUID,
+    request: Request,
+    _sig: TwilioWebhook,
+):
+    """
+    Twilio POSTs here when an outbound call is answered.
+    Returns TwiML to start the bidirectional media stream.
+    """
+    form = await request.form()
+    call_sid = form.get("CallSid", "")
+    from_number = form.get("From", "")
+    to_number = form.get("To", "")
+
     async with AsyncSessionLocal() as db:
         from sqlalchemy import select
         from app.models.voice_agent import CallLog, CallStatus
 
-        # Check if this is an outbound call (CallLog already created)
+        # This endpoint is only reached for outbound calls — the CallLog
+        # already exists (created in initiate_outbound_call before dialling).
         r = await db.execute(
             select(CallLog).where(CallLog.id == call_log_id)
         )
         existing = r.scalar_one_or_none()
 
         if existing:
-            # Outbound — update the call SID and generate stream TwiML
+            # Update the call SID (Twilio assigns it once the call connects)
             existing.call_sid = call_sid
             existing.status = CallStatus.IN_PROGRESS
             await db.commit()
 
             from app.core.config import settings
             from app.voice.factory import get_telephony_provider
-            ws_url = f"wss://{settings.TWILIO_WEBHOOK_BASE_URL.replace('https://', '').replace('http://', '')}/api/v1/voice/stream/{call_log_id}"
+            ws_url = (
+                f"wss://{settings.TWILIO_WEBHOOK_BASE_URL.replace('https://', '').replace('http://', '')}"
+                f"/api/v1/voice/stream/{call_log_id}"
+            )
             twiml = get_telephony_provider().generate_answer_twiml(ws_url)
         else:
-            # Inbound — need to look up voice agent by phone number
-            # For now return minimal TwiML; full inbound routing in Phase 8b
+            # Shouldn't happen — log and return a graceful hangup
             from twilio.twiml.voice_response import VoiceResponse
             vr = VoiceResponse()
-            vr.say("This number is not configured. Goodbye.")
+            vr.say("An error occurred. Goodbye.")
             vr.hangup()
             twiml = str(vr)
 
@@ -188,7 +242,7 @@ async def twilio_answer(call_log_id: uuid.UUID, request: Request):
 
 
 @router.post("/status")
-async def twilio_status_callback(request: Request):
+async def twilio_status_callback(request: Request, _sig: TwilioWebhook):
     """
     Twilio posts call status updates here (completed, failed, etc.).
     Updates the CallLog status accordingly.
