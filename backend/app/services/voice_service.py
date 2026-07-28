@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.agent import Agent, AgentStatus
+from app.models.audit import AuditLogEntry
 from app.models.run import AgentRun, RunStatus
 from app.models.voice_agent import CallLog, CallStatus, VoiceAgent
 from app.schemas.voice import (
@@ -35,10 +36,11 @@ async def create_voice_agent(
     workspace_id: uuid.UUID, data: VoiceAgentCreate, db: AsyncSession
 ) -> VoiceAgentOut:
     # Verify base agent exists and belongs to workspace
-    ag = await db.execute(
+    ag_result = await db.execute(
         select(Agent).where(Agent.id == data.agent_id, Agent.workspace_id == workspace_id)
     )
-    if not ag.scalar_one_or_none():
+    agent = ag_result.scalar_one_or_none()
+    if not agent:
         raise HTTPException(status_code=404, detail="Base agent not found.")
 
     # Check not already a voice agent
@@ -48,6 +50,9 @@ async def create_voice_agent(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="This agent already has voice capabilities.")
 
+    # Guard: skip_compliance_checks cannot be True for a live agent
+    _assert_compliance_bypass_allowed(data.skip_compliance_checks, agent.status)
+
     va = VoiceAgent(
         agent_id=data.agent_id,
         workspace_id=workspace_id,
@@ -56,6 +61,8 @@ async def create_voice_agent(
         tts_voice_id=data.tts_voice_id,
         stt_language=data.stt_language,
         max_concurrent_calls=data.max_concurrent_calls,
+        skip_compliance_checks=data.skip_compliance_checks,
+        escalation_number=data.escalation_number,
     )
     db.add(va)
     await db.flush()
@@ -81,6 +88,14 @@ async def update_voice_agent(
     data: VoiceAgentUpdate, db: AsyncSession
 ) -> VoiceAgentOut:
     va = await _load_va(voice_agent_id, workspace_id, db)
+
+    # If skip_compliance_checks is being set to True, verify agent is not live
+    if data.skip_compliance_checks is True:
+        agent_result = await db.execute(select(Agent).where(Agent.id == va.agent_id))
+        agent = agent_result.scalar_one_or_none()
+        agent_status = agent.status if agent else AgentStatus.DRAFT
+        _assert_compliance_bypass_allowed(True, agent_status)
+
     if data.phone_number is not None:
         va.phone_number = data.phone_number
     if data.voice_mode is not None:
@@ -91,6 +106,10 @@ async def update_voice_agent(
         va.stt_language = data.stt_language
     if data.max_concurrent_calls is not None:
         va.max_concurrent_calls = data.max_concurrent_calls
+    if data.skip_compliance_checks is not None:
+        va.skip_compliance_checks = data.skip_compliance_checks
+    if data.escalation_number is not None:
+        va.escalation_number = data.escalation_number
     await db.flush()
     return VoiceAgentOut.model_validate(va)
 
@@ -129,7 +148,7 @@ async def initiate_outbound_call(
 ) -> CallLogOut:
     va = await _load_va(voice_agent_id, workspace_id, db)
 
-    # Concurrency cap check
+    # Concurrency cap checks
     active = await db.execute(
         select(func.count()).where(
             CallLog.voice_agent_id == voice_agent_id,
@@ -154,6 +173,36 @@ async def initiate_outbound_call(
             detail=f"Workspace concurrent call cap ({settings.MAX_CONCURRENT_CALLS_PER_WORKSPACE}) reached.",
         )
 
+    # ── Compliance checks ─────────────────────────────────────────────────────
+    # Load the base agent for audit logging context
+    agent_result = await db.execute(select(Agent).where(Agent.id == va.agent_id))
+    agent = agent_result.scalar_one_or_none()
+
+    if va.skip_compliance_checks:
+        # Re-assert the live-agent guard even here — belt-and-suspenders
+        if agent and agent.status == AgentStatus.LIVE:
+            raise HTTPException(
+                status_code=422,
+                detail="skip_compliance_checks cannot be active on a live agent.",
+            )
+        # Audit log entry written after run is flushed below
+    else:
+        # Run the full compliance gate
+        from app.services.compliance_service import check_outbound_allowed
+        compliance = await check_outbound_allowed(
+            workspace_id=workspace_id,
+            phone_number=request.to,
+            db=db,
+            agent_id=va.agent_id,
+            agent_name=agent.name if agent else "voice_agent",
+        )
+        if not compliance.can_call:
+            raise HTTPException(
+                status_code=403,
+                detail=compliance.reason or "Compliance check failed.",
+            )
+
+    # ── Build call record ─────────────────────────────────────────────────────
     from_number = va.phone_number or settings.TWILIO_PHONE_NUMBER
     if not from_number:
         raise HTTPException(status_code=422, detail="No phone number configured for this voice agent.")
@@ -167,6 +216,8 @@ async def initiate_outbound_call(
         to_number=request.to,
         direction="outbound",
         status=CallStatus.RINGING,
+        consent_verified=not va.skip_compliance_checks,
+        dnc_checked=not va.skip_compliance_checks,
     )
     db.add(call_log)
     await db.flush()
@@ -182,6 +233,22 @@ async def initiate_outbound_call(
     db.add(run)
     await db.flush()
     call_log.run_id = run.id
+
+    # If compliance was bypassed, write the audit entry now that we have a run_id
+    if va.skip_compliance_checks and agent:
+        db.add(AuditLogEntry(
+            workspace_id=workspace_id,
+            agent_id=va.agent_id,
+            run_id=run.id,
+            agent_name=agent.name,
+            tool_name="compliance_bypass",
+            tool_input_json=json.dumps({
+                "phone_number": request.to,
+                "skip_compliance_checks": True,
+            }),
+            tool_result_json=json.dumps({"note": "Compliance checks skipped — testing mode."}),
+            outcome="success",
+        ))
 
     # Webhook URL for Twilio to POST when call is answered
     webhook_url = (
@@ -200,6 +267,24 @@ async def initiate_outbound_call(
 
     await db.commit()
     return _to_call_log_out(call_log)
+
+
+def _assert_compliance_bypass_allowed(
+    skip: bool,
+    agent_status: AgentStatus,
+) -> None:
+    """
+    Raise HTTP 422 if skip_compliance_checks=True is being set on a live agent.
+    This is a service-layer guard — belt-and-suspenders alongside the UI restriction.
+    """
+    if skip and agent_status == AgentStatus.LIVE:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "skip_compliance_checks cannot be enabled on a Live agent. "
+                "Move the agent to Draft or Testing first."
+            ),
+        )
 
 
 async def handle_inbound_call(

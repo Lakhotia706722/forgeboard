@@ -74,6 +74,16 @@ class VoiceAgent(Base):
     # Concurrent call cap for this specific agent (workspace cap enforced separately)
     max_concurrent_calls: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
+    # Compliance bypass — for internal testing ONLY.
+    # MUST be False when agent.status == AgentStatus.LIVE.
+    # Enforced at the service layer (raises 422) AND recorded in the audit log.
+    skip_compliance_checks: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Escalation: E.164 number to warm-transfer to when sentiment triggers or
+    # Claude calls the transfer_to_human tool.  If None, an email alert is sent
+    # to the workspace owner instead (Phase 8d).
+    escalation_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
     # Counters updated by the call engine
     total_calls: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_call_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

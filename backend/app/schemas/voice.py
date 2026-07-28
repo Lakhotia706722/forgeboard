@@ -28,6 +28,14 @@ class VoiceAgentCreate(BaseModel):
     tts_voice_id: str | None = None
     stt_language: str = "en-US"
     max_concurrent_calls: int = Field(default=1, ge=1, le=10)
+    skip_compliance_checks: bool = Field(
+        default=False,
+        description="Bypass compliance checks. Only valid when agent status is not live.",
+    )
+    escalation_number: str | None = Field(
+        default=None,
+        description="E.164 number to warm-transfer escalated calls to.",
+    )
 
 
 class VoiceAgentUpdate(BaseModel):
@@ -36,6 +44,8 @@ class VoiceAgentUpdate(BaseModel):
     tts_voice_id: str | None = None
     stt_language: str | None = None
     max_concurrent_calls: int | None = Field(default=None, ge=1, le=10)
+    skip_compliance_checks: bool | None = None
+    escalation_number: str | None = None
 
 
 class VoiceAgentOut(BaseModel):
@@ -47,6 +57,8 @@ class VoiceAgentOut(BaseModel):
     tts_voice_id: str | None
     stt_language: str
     max_concurrent_calls: int
+    skip_compliance_checks: bool
+    escalation_number: str | None
     total_calls: int
     total_call_seconds: int
     total_escalations: int

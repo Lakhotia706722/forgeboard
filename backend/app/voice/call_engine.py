@@ -37,6 +37,25 @@ from app.voice.interfaces import TranscriptSegment
 MAX_TURNS = 30           # hard cap on conversation turns
 SILENCE_TIMEOUT = 3.0    # seconds of silence before Claude responds
 
+# AI disclosure prefix — platform constant.
+# This prefix is non-removable.  The trailing text (agent goal) may vary,
+# but every call must begin with this statement identifying the caller as AI.
+# ⚠ Adjust wording only in consultation with legal counsel.
+_DISCLOSURE_PREFIX = "Hello, I'm an AI assistant"
+
+
+def _build_opening(agent_goal: str, agent_name: str) -> str:
+    """
+    Build the mandatory opening statement for every voice call.
+
+    The disclosure prefix is a platform constant and cannot be removed.
+    The trailing text is derived from the agent's goal (truncated for UX).
+    """
+    goal_snippet = agent_goal[:100].rstrip() if agent_goal else ""
+    if goal_snippet:
+        return f"{_DISCLOSURE_PREFIX} calling on behalf of {agent_name}. {goal_snippet}. How can I help you today?"
+    return f"{_DISCLOSURE_PREFIX} calling on behalf of {agent_name}. How can I help you today?"
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -99,17 +118,19 @@ async def run_call_session(
     total_output_tokens = 0
 
     messages: list[dict] = []
-    # Seed the conversation with the AI-disclosure + opening (Phase 8b will enforce this)
-    opening = (
-        f"Hello! I'm an AI assistant. {agent.goal[:120]}. How can I help you today?"
-    )
+    # Build the mandatory AI-disclosure opening using the platform constant prefix.
+    # ai_disclosed is set True immediately after TTS is sent — not at call end.
+    opening = _build_opening(agent.goal, agent.name)
     # TTS the opening and send immediately
     try:
         audio = await tts.synthesize(opening, voice_id=voice_agent.tts_voice_id)
         await _send_audio(websocket, audio.audio_bytes)
         transcript.append(TranscriptSegment(speaker="agent", text=opening, is_final=True))
-    except Exception as e:
-        await _send_audio(websocket, b"")  # send empty to keep stream alive
+        # Mark disclosure as delivered — set on call_log now, not at call end
+        call_log.ai_disclosed = True
+        await db.commit()
+    except Exception:
+        await _send_audio(websocket, b"")  # keep stream alive on TTS failure
 
     messages.append({"role": "user", "content": "The call has started. Begin the conversation."})
 
@@ -247,7 +268,7 @@ async def run_call_session(
         {"speaker": s.speaker, "text": s.text, "timestamp_ms": s.timestamp_ms}
         for s in transcript
     ])
-    call_log.ai_disclosed = True  # opening message always includes disclosure
+    # ai_disclosed was already set True when the opening TTS was sent
 
     # Update voice agent counters
     voice_agent.total_calls += 1
