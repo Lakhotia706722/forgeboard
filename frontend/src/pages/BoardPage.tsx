@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { agentApi, type AgentOut, type AgentStatus } from '@/lib/agentApi'
 import { connectorApi } from '@/lib/connectorApi'
 import { runApi, type RunOut } from '@/lib/runApi'
+import { voiceApi, type VoiceAgentOut } from '@/lib/voiceApi'
 import Button from '@/components/ui/Button'
 import AgentRow from '@/components/agents/AgentRow'
 import AgentBuilderModal from '@/components/agents/AgentBuilderModal'
@@ -39,12 +40,26 @@ export default function BoardPage() {
     refetchInterval: 15000,
   })
 
-  // Build a map: agentId → most recent run
+  // Fetch voice agents — parallel with agents query
+  const { data: voiceAgents = [] } = useQuery({
+    queryKey: ['voice-agents'],
+    queryFn: voiceApi.listVoiceAgents,
+    refetchInterval: 30000,
+  })
+
+  // Build maps
+  // agentId → most recent run
   const lastRunByAgent: Record<string, RunOut> = {}
   for (const run of recentRuns) {
     if (!lastRunByAgent[run.agent_id]) {
       lastRunByAgent[run.agent_id] = run
     }
+  }
+
+  // agentId → VoiceAgentOut (for conditional card rendering on the board)
+  const voiceAgentsByAgentId: Record<string, VoiceAgentOut> = {}
+  for (const va of voiceAgents) {
+    voiceAgentsByAgentId[va.agent_id] = va
   }
 
   // ── Mutation helpers ──────────────────────────────────────────────────────
@@ -179,6 +194,7 @@ export default function BoardPage() {
             <KanbanBoard
               agents={agents}
               lastRunByAgent={lastRunByAgent}
+              voiceAgentsByAgentId={voiceAgentsByAgentId}
               onAgentsChange={setAgents}
               onOpenDetail={setDetailAgent}
             />

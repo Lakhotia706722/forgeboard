@@ -132,6 +132,7 @@ export default function KanbanBoard({
             lane={lane}
             agents={agentsByLane[lane.id] ?? []}
             lastRunByAgent={lastRunByAgent}
+            voiceAgentsByAgentId={voiceAgentsByAgentId}
             onOpenDetail={onOpenDetail}
             isOver={overLaneId === lane.id}
           />
@@ -141,12 +142,21 @@ export default function KanbanBoard({
       {/* Drag overlay — floating ghost card */}
       <DragOverlay>
         {activeAgent && (
-          <AgentCard
-            agent={activeAgent}
-            lastRun={lastRunByAgent[activeAgent.id]}
-            onOpenDetail={() => {}}
-            isDragging
-          />
+          voiceAgentsByAgentId[activeAgent.id] ? (
+            <VoiceAgentCard
+              agent={activeAgent}
+              voiceAgent={voiceAgentsByAgentId[activeAgent.id]}
+              onOpenDetail={() => {}}
+              isDragging
+            />
+          ) : (
+            <AgentCard
+              agent={activeAgent}
+              lastRun={lastRunByAgent[activeAgent.id]}
+              onOpenDetail={() => {}}
+              isDragging
+            />
+          )
         )}
       </DragOverlay>
     </DndContext>
