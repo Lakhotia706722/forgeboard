@@ -1,4 +1,4 @@
-import { X, Phone, Clock, User, Bot } from 'lucide-react'
+import { X, Phone, Clock, User, Bot, Download } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { voiceApi, formatDuration } from '@/lib/voiceApi'
 import CallStatusBadge from './CallStatusBadge'
@@ -88,6 +88,21 @@ export default function CallLogDrawer({ callLogId, onClose }: CallLogDrawerProps
                   <span className="text-gray-500">Call SID</span>
                   <span className="text-gray-500 font-mono text-xs">{call.call_sid}</span>
                 </div>
+                {call.recording_url && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500">Recording</span>
+                    <a
+                      href={call.recording_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-forge-400 hover:text-forge-300 transition-colors"
+                      aria-label="Download call recording"
+                    >
+                      <Download size={11} aria-hidden="true" />
+                      Download .mp3
+                    </a>
+                  </div>
+                )}
               </div>
 
               {/* Compliance indicators */}

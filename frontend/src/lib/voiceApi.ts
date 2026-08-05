@@ -12,6 +12,8 @@ export interface VoiceAgentOut {
   tts_voice_id: string | null
   stt_language: string
   max_concurrent_calls: number
+  skip_compliance_checks: boolean
+  escalation_number: string | null
   total_calls: number
   total_call_seconds: number
   total_escalations: number
@@ -40,6 +42,8 @@ export interface CallLogOut {
   consent_verified: boolean
   dnc_checked: boolean
   ai_disclosed: boolean
+  recording_sid: string | null
+  recording_url: string | null
   started_at: string | null
   ended_at: string | null
   created_at: string

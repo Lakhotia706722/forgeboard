@@ -32,6 +32,11 @@ class TwilioProvider(TelephonyProvider):
         """
         Place an outbound call. Twilio will POST to webhook_url when the call
         is answered so we can return TwiML to start the audio stream.
+
+        Recording is enabled by default (dual-channel).  Twilio stores recordings
+        encrypted at rest with signed-URL access control.  The recording-status
+        callback POSTs back to /voice/recording-status with the RecordingUrl.
+        TODO: For higher-assurance deployments, download + re-encrypt + self-host.
         """
         call = self._client.calls.create(
             to=to,
@@ -40,6 +45,12 @@ class TwilioProvider(TelephonyProvider):
             method="POST",
             status_callback=f"{settings.TWILIO_WEBHOOK_BASE_URL}/api/v1/voice/status",
             status_callback_method="POST",
+            record=True,
+            recording_channels="dual",
+            recording_status_callback=(
+                f"{settings.TWILIO_WEBHOOK_BASE_URL}/api/v1/voice/recording-status"
+            ),
+            recording_status_callback_method="POST",
             **(extra or {}),
         )
         return CallRecord(

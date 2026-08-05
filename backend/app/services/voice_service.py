@@ -390,6 +390,8 @@ def _to_call_log_out(cl: CallLog) -> CallLogOut:
         consent_verified=cl.consent_verified,
         dnc_checked=cl.dnc_checked,
         ai_disclosed=cl.ai_disclosed,
+        recording_sid=cl.recording_sid,
+        recording_url=cl.recording_url,
         started_at=cl.started_at,
         ended_at=cl.ended_at,
         created_at=cl.created_at,

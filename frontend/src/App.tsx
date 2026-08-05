@@ -6,6 +6,7 @@ import DashboardPage from '@/pages/DashboardPage'
 import BoardPage from '@/pages/BoardPage'
 import ConnectorsPage from '@/pages/ConnectorsPage'
 import GovernancePage from '@/pages/GovernancePage'
+import VoicePage from '@/pages/VoicePage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import GuestRoute from '@/components/GuestRoute'
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/board" element={<BoardPage />} />
           <Route path="/connectors" element={<ConnectorsPage />} />
           <Route path="/governance" element={<GovernancePage />} />
+          <Route path="/voice" element={<VoicePage />} />
         </Route>
 
         {/* Redirects */}

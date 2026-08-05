@@ -149,6 +149,12 @@ class CallLog(Base):
     # Transcript stored as JSON array of {speaker, text, timestamp_ms}
     transcript_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Call recording — Twilio-hosted URL (signed, encrypted at rest by Twilio).
+    # TODO: For higher-assurance deployments, download + re-encrypt + self-host
+    # in an S3/GCS bucket rather than relying on Twilio's storage.
+    recording_sid: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    recording_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Compliance flags (populated by Phase 8b)
     consent_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     dnc_checked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

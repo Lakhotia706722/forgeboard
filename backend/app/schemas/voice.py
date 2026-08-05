@@ -93,6 +93,8 @@ class CallLogOut(BaseModel):
     consent_verified: bool
     dnc_checked: bool
     ai_disclosed: bool
+    recording_sid: str | None = None
+    recording_url: str | None = None
     started_at: datetime | None
     ended_at: datetime | None
     created_at: datetime

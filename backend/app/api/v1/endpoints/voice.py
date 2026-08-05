@@ -241,6 +241,51 @@ async def twilio_answer(
     return PlainTextResponse(content=twiml, media_type="application/xml")
 
 
+@router.post("/recording-status")
+async def twilio_recording_status(request: Request, _sig: TwilioWebhook):
+    """
+    Twilio POSTs here when a call recording is ready.
+    Stores the recording URL and SID on the associated CallLog.
+
+    Note: Recording URL is Twilio-hosted with signed-URL access control
+    and encrypted at rest by Twilio.  Access requires valid Twilio credentials.
+    TODO: For higher-assurance deployments, download + re-encrypt + self-host.
+    """
+    form = await request.form()
+    call_sid = form.get("CallSid", "")
+    recording_sid = form.get("RecordingSid", "")
+    recording_url = form.get("RecordingUrl", "")
+    recording_status = form.get("RecordingStatus", "")
+
+    if recording_status != "completed" or not recording_url:
+        # Not ready yet or failed — nothing to store
+        return PlainTextResponse(
+            content="<?xml version='1.0'?><Response/>",
+            media_type="application/xml",
+        )
+
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import select
+        from app.models.voice_agent import CallLog
+        r = await db.execute(
+            select(CallLog).where(CallLog.call_sid == call_sid)
+        )
+        cl = r.scalar_one_or_none()
+        if cl:
+            cl.recording_sid = recording_sid
+            # Append .mp3 for direct playback if not already present
+            cl.recording_url = (
+                recording_url if recording_url.endswith(".mp3")
+                else recording_url + ".mp3"
+            )
+            await db.commit()
+
+    return PlainTextResponse(
+        content="<?xml version='1.0'?><Response/>",
+        media_type="application/xml",
+    )
+
+
 @router.post("/status")
 async def twilio_status_callback(request: Request, _sig: TwilioWebhook):
     """

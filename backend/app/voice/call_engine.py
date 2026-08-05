@@ -32,6 +32,7 @@ from app.schemas.agent import AgentConfig
 from app.schemas.run import TraceEvent
 from app.voice.factory import get_stt_provider, get_tts_provider
 from app.voice.interfaces import TranscriptSegment
+from app.voice.redaction import redact_transcript
 
 
 MAX_TURNS = 30           # hard cap on conversation turns
@@ -264,6 +265,8 @@ async def run_call_session(
         call_log.duration_seconds = int(
             (_now() - call_log.started_at).total_seconds()
         )
+    # Redact sensitive data from the transcript before persisting
+    transcript = redact_transcript(transcript)
     call_log.transcript_json = json.dumps([
         {"speaker": s.speaker, "text": s.text, "timestamp_ms": s.timestamp_ms}
         for s in transcript
