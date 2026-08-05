@@ -13,13 +13,16 @@ import toast from 'react-hot-toast'
 
 import { agentApi, type AgentOut, type AgentStatus } from '@/lib/agentApi'
 import type { RunOut } from '@/lib/runApi'
+import type { VoiceAgentOut } from '@/lib/voiceApi'
 import { LANES } from './boardConfig'
 import KanbanLane from './KanbanLane'
 import AgentCard from './AgentCard'
+import VoiceAgentCard from '@/components/voice/VoiceAgentCard'
 
 interface KanbanBoardProps {
   agents: AgentOut[]
   lastRunByAgent: Record<string, RunOut>
+  voiceAgentsByAgentId: Record<string, VoiceAgentOut>
   onAgentsChange: (agents: AgentOut[]) => void
   onOpenDetail: (agent: AgentOut) => void
 }
@@ -27,6 +30,7 @@ interface KanbanBoardProps {
 export default function KanbanBoard({
   agents,
   lastRunByAgent,
+  voiceAgentsByAgentId,
   onAgentsChange,
   onOpenDetail,
 }: KanbanBoardProps) {
