@@ -3,13 +3,16 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { cn } from '@/lib/utils'
 import type { AgentOut } from '@/lib/agentApi'
 import type { RunOut } from '@/lib/runApi'
+import type { VoiceAgentOut } from '@/lib/voiceApi'
 import type { LaneConfig } from './boardConfig'
 import AgentCard from './AgentCard'
+import VoiceAgentCard from '@/components/voice/VoiceAgentCard'
 
 interface KanbanLaneProps {
   lane: LaneConfig
   agents: AgentOut[]
   lastRunByAgent: Record<string, RunOut>
+  voiceAgentsByAgentId: Record<string, VoiceAgentOut>
   onOpenDetail: (agent: AgentOut) => void
   isOver: boolean
 }
@@ -18,6 +21,7 @@ export default function KanbanLane({
   lane,
   agents,
   lastRunByAgent,
+  voiceAgentsByAgentId,
   onOpenDetail,
   isOver,
 }: KanbanLaneProps) {
@@ -56,14 +60,24 @@ export default function KanbanLane({
           items={agents.map((a) => a.id)}
           strategy={verticalListSortingStrategy}
         >
-          {agents.map((agent) => (
-            <AgentCard
-              key={agent.id}
-              agent={agent}
-              lastRun={lastRunByAgent[agent.id]}
-              onOpenDetail={onOpenDetail}
-            />
-          ))}
+          {agents.map((agent) => {
+            const voiceAgent = voiceAgentsByAgentId[agent.id]
+            return voiceAgent ? (
+              <VoiceAgentCard
+                key={agent.id}
+                agent={agent}
+                voiceAgent={voiceAgent}
+                onOpenDetail={onOpenDetail}
+              />
+            ) : (
+              <AgentCard
+                key={agent.id}
+                agent={agent}
+                lastRun={lastRunByAgent[agent.id]}
+                onOpenDetail={onOpenDetail}
+              />
+            )
+          })}
         </SortableContext>
 
         {agents.length === 0 && (
