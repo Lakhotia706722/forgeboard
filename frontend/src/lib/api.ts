@@ -6,11 +6,17 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// ── Request: attach Bearer token ─────────────────────────────────────────────
+// ── Request: attach Bearer token + X-Workspace-ID ───────────────────────────
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const { accessToken, activeWorkspaceId } = useAuthStore.getState()
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`
+  }
+  // Send active workspace on every request so the server can scope data correctly.
+  // Auth endpoints (/auth/login, /auth/signup, /auth/refresh, /auth/logout,
+  // /auth/workspaces) don't need it — the server ignores an extra header there.
+  if (activeWorkspaceId) {
+    config.headers['X-Workspace-ID'] = activeWorkspaceId
   }
   return config
 })

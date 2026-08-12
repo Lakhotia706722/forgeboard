@@ -6,6 +6,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.models.user import WorkspaceMemberStatus, WorkspaceRole
+
 
 # ---------------------------------------------------------------------------
 # Request bodies
@@ -36,6 +38,15 @@ class RefreshRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Workspace creation
+# ---------------------------------------------------------------------------
+
+class WorkspaceCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Response bodies
 # ---------------------------------------------------------------------------
 
@@ -43,7 +54,12 @@ class WorkspaceOut(BaseModel):
     id: uuid.UUID
     name: str
     slug: str
+    description: str | None = None
     created_at: datetime
+    # The calling user's role + status in this workspace
+    # Populated by the auth / workspace service, not from the ORM directly
+    role: WorkspaceRole | None = None
+    member_status: WorkspaceMemberStatus | None = None
 
     model_config = {"from_attributes": True}
 
@@ -54,6 +70,10 @@ class UserOut(BaseModel):
     full_name: str
     is_active: bool
     created_at: datetime
+    # Multi-workspace: list of all workspaces the user belongs to (active + pending)
+    workspaces: list[WorkspaceOut] = []
+    # Legacy field kept for backwards compatibility — set to first active workspace
+    # Deprecated: clients should use workspaces[] and X-Workspace-ID header
     workspace: WorkspaceOut | None = None
 
     model_config = {"from_attributes": True}
