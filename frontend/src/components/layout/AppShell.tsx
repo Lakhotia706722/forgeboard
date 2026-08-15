@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/lib/authApi'
 import { cn } from '@/lib/utils'
+import { useBranding } from '@/hooks/useBranding'
 import WorkspaceSwitcher from '@/components/workspace/WorkspaceSwitcher'
 import PendingInviteBanner from '@/components/workspace/PendingInviteBanner'
 
@@ -27,10 +28,14 @@ export default function AppShell({ children }: AppShellProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, clearAuth } = useAuthStore()
+  const branding = useBranding()
 
   // Show Agency link only when user has at least one agency membership
   const isAgency = user?.workspaces.some((w) => w.role === 'agency')
   const navItems = isAgency ? [...BASE_NAV, AGENCY_NAV] : BASE_NAV
+
+  const appName = branding?.brand_app_name ?? 'ForgeBoard'
+  const logoUrl = branding?.brand_logo_url ?? null
 
   async function handleLogout() {
     try {
@@ -47,8 +52,16 @@ export default function AppShell({ children }: AppShellProps) {
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
       {/* Top nav */}
       <nav className="border-b border-gray-800 bg-gray-900 px-6 h-14 flex items-center gap-4 flex-shrink-0">
-        <Link to="/dashboard" className="text-base font-bold text-white tracking-tight mr-1">
-          ⚒ ForgeBoard
+        <Link to="/dashboard" className="flex items-center gap-2 mr-1 text-white tracking-tight">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={`${appName} logo`}
+              className="h-7 w-auto max-w-[120px] object-contain"
+            />
+          ) : (
+            <span className="text-base font-bold">⚒ {appName}</span>
+          )}
         </Link>
 
         {/* Workspace switcher */}
