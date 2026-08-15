@@ -100,6 +100,18 @@ class Workspace(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     spend_cap_usd_cents: Mapped[int] = mapped_column(default=5000, nullable=False)
+
+    # White-label branding (Phase 9d) — all nullable; NULL = use platform defaults
+    # The agency user who manages this workspace on behalf of a client
+    managed_by_agency_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    brand_logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    brand_primary_color: Mapped[str | None] = mapped_column(String(7), nullable=True)  # hex e.g. "#6366f1"
+    brand_app_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
