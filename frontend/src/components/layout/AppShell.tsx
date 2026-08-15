@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Cpu, LayoutDashboard, LogOut, Phone, Plug, Settings, Shield } from 'lucide-react'
+import { Building2, Cpu, LayoutDashboard, LogOut, Phone, Plug, Settings, Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { useAuthStore } from '@/store/authStore'
@@ -12,7 +12,7 @@ interface AppShellProps {
   children: React.ReactNode
 }
 
-const navItems = [
+const BASE_NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/board', label: 'Agents', icon: Cpu },
   { to: '/connectors', label: 'Connectors', icon: Plug },
@@ -21,10 +21,16 @@ const navItems = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
+const AGENCY_NAV = { to: '/agency', label: 'Agency', icon: Building2 }
+
 export default function AppShell({ children }: AppShellProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, clearAuth } = useAuthStore()
+
+  // Show Agency link only when user has at least one agency membership
+  const isAgency = user?.workspaces.some((w) => w.role === 'agency')
+  const navItems = isAgency ? [...BASE_NAV, AGENCY_NAV] : BASE_NAV
 
   async function handleLogout() {
     try {
