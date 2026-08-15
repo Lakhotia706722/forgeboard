@@ -9,7 +9,8 @@ import OnboardingBanner from '@/components/onboarding/OnboardingBanner'
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
-  const workspace = user?.workspace
+  const activeWorkspace = useAuthStore((s) => s.activeWorkspace)
+  const workspace = activeWorkspace()
   const firstName = user?.full_name?.split(' ')[0] ?? 'there'
 
   const { data: agents = [] } = useQuery({ queryKey: ['agents'], queryFn: agentApi.list })
