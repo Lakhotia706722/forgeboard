@@ -1,26 +1,27 @@
 """
 Connector endpoints:
-  GET    /connectors                     — list workspace connectors
-  GET    /connectors/{id}               — get one
-  DELETE /connectors/{id}               — disconnect / remove
-  POST   /connectors/http               — create HTTP/webhook connector
-  POST   /connectors/kv                 — create KV store connector
-  POST   /connectors/google-calendar    — create Google Calendar (starts OAuth)
-  POST   /connectors/gmail              — create Gmail (starts OAuth)
+  GET    /connectors                     — list workspace connectors   [all roles]
+  GET    /connectors/{id}               — get one                     [all roles]
+  DELETE /connectors/{id}               — disconnect / remove         [admin, owner]
+  POST   /connectors/http               — create HTTP/webhook         [admin, owner]
+  POST   /connectors/kv                 — create KV store             [admin, owner]
+  POST   /connectors/google-calendar    — create Google Calendar      [admin, owner]
+  POST   /connectors/gmail              — create Gmail                [admin, owner]
   GET    /connectors/oauth/google/init/{connector_id}   — redirect to Google OAuth
   GET    /connectors/oauth/google/callback              — OAuth callback
-  POST   /connectors/{id}/health-check  — run health check
-  GET    /connectors/{id}/kv            — list KV entries
-  PUT    /connectors/{id}/kv/{key}      — set KV entry
-  GET    /connectors/{id}/kv/{key}      — get KV entry
-  DELETE /connectors/{id}/kv/{key}      — delete KV entry
+  POST   /connectors/{id}/health-check  — run health check            [admin, owner]
+  GET    /connectors/{id}/kv            — list KV entries             [all roles]
+  PUT    /connectors/{id}/kv/{key}      — set KV entry                [builder, admin, owner]
+  GET    /connectors/{id}/kv/{key}      — get KV entry                [all roles]
+  DELETE /connectors/{id}/kv/{key}      — delete KV entry             [builder, admin, owner]
 """
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Query
 from fastapi.responses import RedirectResponse
 
-from app.api.deps import CurrentUser, CurrentWorkspace, DB
+from app.api.deps import CurrentUser, CurrentWorkspace, DB, require_role
 from app.core.config import settings
 from app.models.connector import ConnectorType
 from app.schemas.connector import (
@@ -39,6 +40,9 @@ from datetime import datetime, timezone
 
 router = APIRouter()
 
+_ADMIN_UP   = require_role("owner", "admin")
+_BUILDER_UP = require_role("owner", "admin", "builder")
+
 
 # ---------------------------------------------------------------------------
 # List / Get / Delete
@@ -55,7 +59,12 @@ async def get_connector(connector_id: uuid.UUID, workspace: CurrentWorkspace, db
 
 
 @router.delete("/{connector_id}", status_code=204)
-async def delete_connector(connector_id: uuid.UUID, workspace: CurrentWorkspace, db: DB):
+async def delete_connector(
+    connector_id: uuid.UUID,
+    _: Annotated[None, _ADMIN_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
+):
     await connector_service.delete_connector(connector_id, workspace.id, db)
 
 
@@ -64,24 +73,42 @@ async def delete_connector(connector_id: uuid.UUID, workspace: CurrentWorkspace,
 # ---------------------------------------------------------------------------
 
 @router.post("/http", response_model=ConnectorOut, status_code=201)
-async def create_http_webhook(body: HttpWebhookCreate, workspace: CurrentWorkspace, db: DB):
+async def create_http_webhook(
+    body: HttpWebhookCreate,
+    _: Annotated[None, _ADMIN_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
+):
     return await connector_service.create_http_webhook(workspace.id, body, db)
 
 
 @router.post("/kv", response_model=ConnectorOut, status_code=201)
-async def create_kv_store(body: KvStoreCreate, workspace: CurrentWorkspace, db: DB):
+async def create_kv_store(
+    body: KvStoreCreate,
+    _: Annotated[None, _ADMIN_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
+):
     return await connector_service.create_kv_store(workspace.id, body, db)
 
 
 @router.post("/google-calendar", response_model=ConnectorOut, status_code=201)
 async def create_google_calendar(
-    body: GoogleCalendarCreate, workspace: CurrentWorkspace, db: DB
+    body: GoogleCalendarCreate,
+    _: Annotated[None, _ADMIN_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
 ):
     return await connector_service.create_google_calendar(workspace.id, body, db)
 
 
 @router.post("/gmail", response_model=ConnectorOut, status_code=201)
-async def create_gmail(body: GmailCreate, workspace: CurrentWorkspace, db: DB):
+async def create_gmail(
+    body: GmailCreate,
+    _: Annotated[None, _ADMIN_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
+):
     return await connector_service.create_gmail(workspace.id, body, db)
 
 
@@ -157,7 +184,12 @@ async def google_oauth_callback(
 # ---------------------------------------------------------------------------
 
 @router.post("/{connector_id}/health-check", response_model=ConnectorOut)
-async def health_check(connector_id: uuid.UUID, workspace: CurrentWorkspace, db: DB):
+async def health_check(
+    connector_id: uuid.UUID,
+    _: Annotated[None, _ADMIN_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
+):
     return await connector_service.health_check_connector(connector_id, workspace.id, db)
 
 
@@ -168,7 +200,6 @@ async def health_check(connector_id: uuid.UUID, workspace: CurrentWorkspace, db:
 @router.get("/{connector_id}/kv", response_model=KvListResponse)
 async def kv_list(connector_id: uuid.UUID, workspace: CurrentWorkspace, db: DB):
     """List all key-value entries for this workspace's KV store."""
-    # Verify the connector is a KV store type belonging to this workspace
     conn = await connector_service.get_connector(connector_id, workspace.id, db)
     if conn.connector_type != ConnectorType.KV_STORE:
         from fastapi import HTTPException, status
@@ -182,6 +213,7 @@ async def kv_set(
     connector_id: uuid.UUID,
     key: str,
     body: KvSetRequest,
+    _: Annotated[None, _BUILDER_UP],
     workspace: CurrentWorkspace,
     db: DB,
 ):
@@ -196,5 +228,11 @@ async def kv_get(connector_id: uuid.UUID, key: str, workspace: CurrentWorkspace,
 
 
 @router.delete("/{connector_id}/kv/{key}", status_code=204)
-async def kv_delete(connector_id: uuid.UUID, key: str, workspace: CurrentWorkspace, db: DB):
+async def kv_delete(
+    connector_id: uuid.UUID,
+    key: str,
+    _: Annotated[None, _BUILDER_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
+):
     await connector_service.kv_delete(workspace.id, key, db)
