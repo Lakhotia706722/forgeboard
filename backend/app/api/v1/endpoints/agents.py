@@ -1,24 +1,28 @@
 """
 Agent endpoints:
-  GET    /agents              — list workspace agents
-  POST   /agents              — create agent (saves as Draft)
-  GET    /agents/{id}         — get agent
-  PATCH  /agents/{id}         — update agent fields
-  DELETE /agents/{id}         — delete agent
-  PATCH  /agents/{id}/status  — update Kanban status (drag-and-drop in Phase 5)
-  GET    /agents/{id}/config  — return compiled AgentConfig (debug / Phase 4 preview)
+  GET    /agents              — list workspace agents  [all roles]
+  POST   /agents              — create agent           [builder, admin, owner]
+  GET    /agents/{id}         — get agent              [all roles]
+  PATCH  /agents/{id}         — update agent fields    [builder, admin, owner]
+  DELETE /agents/{id}         — delete agent           [builder, admin, owner]
+  PATCH  /agents/{id}/status  — update Kanban status   [builder, admin, owner]
+  GET    /agents/{id}/config  — return compiled config [all roles]
 """
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.deps import CurrentWorkspace, DB
+from app.api.deps import CurrentWorkspace, DB, require_role
 from app.models.agent import AgentStatus
 from app.schemas.agent import AgentConfig, AgentCreate, AgentOut, AgentStatusUpdate, AgentUpdate
 from app.services import agent_service
 import json
 
 router = APIRouter()
+
+_BUILDER_UP = require_role("owner", "admin", "builder")
+_ADMIN_UP   = require_role("owner", "admin")
 
 
 @router.get("", response_model=list[AgentOut])
@@ -27,7 +31,12 @@ async def list_agents(workspace: CurrentWorkspace, db: DB):
 
 
 @router.post("", response_model=AgentOut, status_code=201)
-async def create_agent(body: AgentCreate, workspace: CurrentWorkspace, db: DB):
+async def create_agent(
+    body: AgentCreate,
+    _: Annotated[None, _BUILDER_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
+):
     """
     Create a new agent in Draft status.
     Validates connector ownership, builds the system prompt + tool config,
@@ -43,20 +52,33 @@ async def get_agent(agent_id: uuid.UUID, workspace: CurrentWorkspace, db: DB):
 
 @router.patch("/{agent_id}", response_model=AgentOut)
 async def update_agent(
-    agent_id: uuid.UUID, body: AgentUpdate, workspace: CurrentWorkspace, db: DB
+    agent_id: uuid.UUID,
+    body: AgentUpdate,
+    _: Annotated[None, _BUILDER_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
 ):
     """Partial update — only provided fields are changed. Rebuilds agent config."""
     return await agent_service.update_agent(agent_id, workspace.id, body, db)
 
 
 @router.delete("/{agent_id}", status_code=204)
-async def delete_agent(agent_id: uuid.UUID, workspace: CurrentWorkspace, db: DB):
+async def delete_agent(
+    agent_id: uuid.UUID,
+    _: Annotated[None, _BUILDER_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
+):
     await agent_service.delete_agent(agent_id, workspace.id, db)
 
 
 @router.patch("/{agent_id}/status", response_model=AgentOut)
 async def update_agent_status(
-    agent_id: uuid.UUID, body: AgentStatusUpdate, workspace: CurrentWorkspace, db: DB
+    agent_id: uuid.UUID,
+    body: AgentStatusUpdate,
+    _: Annotated[None, _BUILDER_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
 ):
     """
     Move an agent between Kanban lanes.

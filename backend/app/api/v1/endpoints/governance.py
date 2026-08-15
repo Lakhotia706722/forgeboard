@@ -1,21 +1,23 @@
 """
 Governance endpoints:
-  GET  /governance/audit              — list audit log entries
-  GET  /governance/audit/export       — export as JSON or CSV
-  GET  /governance/spend              — current spend vs cap
-  PATCH /governance/spend-cap         — update workspace spend cap
-  GET  /governance/pending-approvals  — agents awaiting approval
+  GET  /governance/audit              — list audit log entries        [all roles]
+  GET  /governance/audit/export       — export as JSON or CSV         [admin, owner]
+  GET  /governance/spend              — current spend vs cap          [all roles]
+  PATCH /governance/spend-cap         — update workspace spend cap    [admin, owner]
+  GET  /governance/pending-approvals  — agents awaiting approval      [all roles]
 """
 import uuid
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Query
 from fastapi.responses import PlainTextResponse, Response
 
-from app.api.deps import CurrentWorkspace, DB
+from app.api.deps import CurrentWorkspace, DB, require_role
 from app.services import governance_service
 
 router = APIRouter()
+
+_ADMIN_UP = require_role("owner", "admin")
 
 
 @router.get("/audit")
@@ -47,13 +49,14 @@ async def list_audit_log(
 
 @router.get("/audit/export")
 async def export_audit_log(
+    _: Annotated[None, _ADMIN_UP],
     workspace: CurrentWorkspace,
     db: DB,
     format: str = Query(default="json", pattern="^(json|csv)$"),
     agent_id: Optional[uuid.UUID] = Query(default=None),
     limit: int = Query(default=1000, le=5000),
 ):
-    """Export audit log as JSON or CSV download."""
+    """Export audit log as JSON or CSV download. Requires admin or owner."""
     entries = await governance_service.list_audit_log(
         workspace.id, db, agent_id=agent_id, limit=limit
     )
@@ -82,6 +85,7 @@ async def get_spend(workspace: CurrentWorkspace, db: DB):
 
 @router.patch("/spend-cap")
 async def update_spend_cap(
+    _: Annotated[None, _ADMIN_UP],
     workspace: CurrentWorkspace,
     db: DB,
     cap_usd_cents: int = Query(
@@ -90,7 +94,7 @@ async def update_spend_cap(
         description="New spend cap in USD cents (e.g. 5000 = $50.00)",
     ),
 ):
-    """Update the hard spend cap for this workspace."""
+    """Update the hard spend cap. Requires admin or owner."""
     return await governance_service.update_spend_cap(workspace.id, cap_usd_cents, db)
 
 

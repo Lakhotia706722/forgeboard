@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Cpu, LayoutDashboard, LogOut, Phone, Plug, Shield } from 'lucide-react'
+import { Cpu, LayoutDashboard, LogOut, Phone, Plug, Settings, Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { useAuthStore } from '@/store/authStore'
@@ -18,6 +18,7 @@ const navItems = [
   { to: '/connectors', label: 'Connectors', icon: Plug },
   { to: '/voice', label: 'Voice', icon: Phone },
   { to: '/governance', label: 'Governance', icon: Shield },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export default function AppShell({ children }: AppShellProps) {

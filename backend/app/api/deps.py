@@ -121,6 +121,64 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 
 
 # ---------------------------------------------------------------------------
+# RBAC — role-based access control helpers
+# ---------------------------------------------------------------------------
+
+async def current_member(
+    user: Annotated[User, Depends(current_user)],
+    workspace: Annotated[Workspace, Depends(current_workspace)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> "WorkspaceMember":
+    """
+    Return the WorkspaceMember row for the current user+workspace.
+    Used by require_role() to check permissions.
+    """
+    result = await db.execute(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace.id,
+            WorkspaceMember.user_id == user.id,
+            WorkspaceMember.status == WorkspaceMemberStatus.ACTIVE,
+        )
+    )
+    member = result.scalar_one_or_none()
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an active member of this workspace.",
+        )
+    return member
+
+
+CurrentMember = Annotated["WorkspaceMember", Depends(current_member)]
+
+
+def require_role(*allowed_roles: "WorkspaceRole"):
+    """
+    Dependency factory: raises 403 if the calling user's role is not in
+    allowed_roles for the current workspace.
+
+    Usage in endpoints:
+        @router.delete("/{id}")
+        async def delete_something(
+            _: Annotated[None, Depends(require_role("owner", "admin"))],
+            workspace: CurrentWorkspace,
+            db: DB,
+        ):
+    """
+    from app.models.user import WorkspaceRole as _Role
+
+    async def _check(member: CurrentMember) -> None:
+        if member.role not in allowed_roles:
+            allowed_str = ", ".join(r if isinstance(r, str) else r.value for r in allowed_roles)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"This action requires one of these roles: {allowed_str}.",
+            )
+
+    return Depends(_check)
+
+
+# ---------------------------------------------------------------------------
 # Twilio webhook signature validation
 # ---------------------------------------------------------------------------
 
