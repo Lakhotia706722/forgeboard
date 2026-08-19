@@ -25,6 +25,9 @@ interface KanbanBoardProps {
   voiceAgentsByAgentId: Record<string, VoiceAgentOut>
   onAgentsChange: (agents: AgentOut[]) => void
   onOpenDetail: (agent: AgentOut) => void
+  // Multi-select (9e)
+  selectedIds?: Set<string>
+  onToggleSelect?: (agent: AgentOut, e: React.MouseEvent) => void
 }
 
 export default function KanbanBoard({
@@ -33,6 +36,8 @@ export default function KanbanBoard({
   voiceAgentsByAgentId,
   onAgentsChange,
   onOpenDetail,
+  selectedIds = new Set(),
+  onToggleSelect,
 }: KanbanBoardProps) {
   const [activeAgent, setActiveAgent] = useState<AgentOut | null>(null)
   const [overLaneId, setOverLaneId] = useState<AgentStatus | null>(null)
@@ -135,6 +140,8 @@ export default function KanbanBoard({
             voiceAgentsByAgentId={voiceAgentsByAgentId}
             onOpenDetail={onOpenDetail}
             isOver={overLaneId === lane.id}
+            selectedIds={selectedIds}
+            onToggleSelect={onToggleSelect}
           />
         ))}
       </div>

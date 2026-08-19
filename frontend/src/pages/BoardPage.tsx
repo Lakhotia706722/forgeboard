@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, LayoutGrid, List } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -12,6 +12,7 @@ import AgentRow from '@/components/agents/AgentRow'
 import AgentBuilderModal from '@/components/agents/AgentBuilderModal'
 import KanbanBoard from '@/components/board/KanbanBoard'
 import AgentDetailDrawer from '@/components/board/AgentDetailDrawer'
+import BulkActionBar from '@/components/board/BulkActionBar'
 import { cn } from '@/lib/utils'
 
 type ViewMode = 'kanban' | 'list'
@@ -22,6 +23,20 @@ export default function BoardPage() {
   const [showBuilder, setShowBuilder] = useState(false)
   const [editingAgent, setEditingAgent] = useState<AgentOut | undefined>(undefined)
   const [detailAgent, setDetailAgent] = useState<AgentOut | null>(null)
+  // Multi-select state (9e)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const toggleSelect = useCallback((agent: AgentOut, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(agent.id)) next.delete(agent.id)
+      else next.add(agent.id)
+      return next
+    })
+  }, [])
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
 
   const { data: agents = [], isLoading: agentsLoading } = useQuery({
     queryKey: ['agents'],
@@ -197,6 +212,8 @@ export default function BoardPage() {
               voiceAgentsByAgentId={voiceAgentsByAgentId}
               onAgentsChange={setAgents}
               onOpenDetail={setDetailAgent}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
             />
           </div>
         )}
@@ -255,6 +272,16 @@ export default function BoardPage() {
           onDelete={handleDelete}
           onStatusChange={handleStatusChange}
           onAgentUpdated={upsertAgent}
+        />
+      )}
+
+      {/* Bulk action bar — appears when agents are selected */}
+      {selectedIds.size > 0 && (
+        <BulkActionBar
+          selected={agents.filter((a) => selectedIds.has(a.id))}
+          onClearSelection={clearSelection}
+          onAgentsChange={setAgents}
+          allAgents={agents}
         />
       )}
 
