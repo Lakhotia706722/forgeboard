@@ -16,6 +16,9 @@ interface AgentCardProps {
   lastRun?: RunOut
   onOpenDetail: (agent: AgentOut) => void
   isDragging?: boolean
+  // Multi-select (9e)
+  isSelected?: boolean
+  onToggleSelect?: (agent: AgentOut, e: React.MouseEvent) => void
 }
 
 const RUN_STATUS_DOT: Record<string, string> = {
@@ -31,6 +34,8 @@ export default function AgentCard({
   lastRun,
   onOpenDetail,
   isDragging = false,
+  isSelected = false,
+  onToggleSelect,
 }: AgentCardProps) {
   const {
     attributes,
@@ -57,15 +62,39 @@ export default function AgentCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group bg-gray-900 border border-gray-800 rounded-xl p-3.5',
+        'group bg-gray-900 border rounded-xl p-3.5',
         'hover:border-gray-700 transition-colors cursor-pointer',
+        isSelected
+          ? 'border-forge-500 ring-1 ring-forge-500/40'
+          : 'border-gray-800',
         (isDragging || isSortableDragging) && 'opacity-50 shadow-2xl ring-2 ring-forge-500',
       )}
       onClick={() => onOpenDetail(agent)}
     >
-      {/* Top row: drag handle + name + alert */}
+      {/* Top row: checkbox + drag handle + name + alert */}
       <div className="flex items-start gap-2">
-        {/* Drag handle — separate from click */}
+        {/* Selection checkbox — stopPropagation so it doesn't open detail */}
+        {onToggleSelect && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(agent, e) }}
+            className={cn(
+              'mt-0.5 flex-shrink-0 h-4 w-4 rounded border transition-colors',
+              isSelected
+                ? 'bg-forge-500 border-forge-500'
+                : 'border-gray-600 hover:border-gray-400 bg-transparent',
+            )}
+            aria-label={isSelected ? `Deselect ${agent.name}` : `Select ${agent.name}`}
+            aria-pressed={isSelected}
+          >
+            {isSelected && (
+              <svg viewBox="0 0 12 12" className="w-full h-full text-white" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+        )}
+
+        {/* Drag handle */}
         <button
           {...attributes}
           {...listeners}
@@ -96,13 +125,11 @@ export default function AgentCard({
 
       {/* Bottom row: meta info */}
       <div className="flex items-center gap-3 mt-3 pt-2.5 border-t border-gray-800">
-        {/* Trigger */}
         <span className="flex items-center gap-1 text-xs text-gray-600">
           <TriggerIcon size={11} aria-hidden="true" />
           {agent.trigger_type}
         </span>
 
-        {/* Last run status */}
         {lastRun && (
           <span className="flex items-center gap-1 text-xs text-gray-600">
             <span
@@ -114,21 +141,11 @@ export default function AgentCard({
         )}
 
         <span className="flex-1" />
-
-        {/* Run count */}
         <span className="text-xs text-gray-700">{agent.total_runs} runs</span>
+        {costDisplay && <span className="text-xs text-gray-700">{costDisplay}</span>}
 
-        {/* Cost */}
-        {costDisplay && (
-          <span className="text-xs text-gray-700">{costDisplay}</span>
-        )}
-
-        {/* Edit shortcut */}
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpenDetail(agent)
-          }}
+          onClick={(e) => { e.stopPropagation(); onOpenDetail(agent) }}
           className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-opacity"
           aria-label={`Open ${agent.name} detail`}
         >

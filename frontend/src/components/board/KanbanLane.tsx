@@ -15,6 +15,9 @@ interface KanbanLaneProps {
   voiceAgentsByAgentId: Record<string, VoiceAgentOut>
   onOpenDetail: (agent: AgentOut) => void
   isOver: boolean
+  // Multi-select (9e)
+  selectedIds?: Set<string>
+  onToggleSelect?: (agent: AgentOut, e: React.MouseEvent) => void
 }
 
 export default function KanbanLane({
@@ -24,6 +27,8 @@ export default function KanbanLane({
   voiceAgentsByAgentId,
   onOpenDetail,
   isOver,
+  selectedIds = new Set(),
+  onToggleSelect,
 }: KanbanLaneProps) {
   const { setNodeRef } = useDroppable({ id: lane.id })
 
@@ -75,6 +80,8 @@ export default function KanbanLane({
                 agent={agent}
                 lastRun={lastRunByAgent[agent.id]}
                 onOpenDetail={onOpenDetail}
+                isSelected={selectedIds.has(agent.id)}
+                onToggleSelect={onToggleSelect}
               />
             )
           })}
