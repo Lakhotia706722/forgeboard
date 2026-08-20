@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Store, Download, Search, Filter, Star, Clock, Zap, Calendar, Bell, Package } from 'lucide-react'
+import { Store, Download, Search, Star, Clock, Zap, Calendar, Bell, Package } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 import AppShell from '@/components/layout/AppShell'
 import { marketplaceApi, type ListingOut, type ListingType } from '@/lib/marketplaceApi'
@@ -38,9 +38,13 @@ function ListingCard({ listing, onInstall, installing }: ListingCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-white text-sm leading-tight truncate">
+          <Link
+            to={`/marketplace/${listing.id}`}
+            className="font-semibold text-white text-sm leading-tight truncate hover:text-forge-300 transition-colors block"
+            onClick={(e) => e.stopPropagation()}
+          >
             {listing.name}
-          </h3>
+          </Link>
           <div className="flex items-center gap-2 mt-1">
             <span className="flex items-center gap-1 text-xs text-gray-500">
               <CategoryIcon category={listing.category} />
