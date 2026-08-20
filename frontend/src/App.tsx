@@ -13,6 +13,7 @@ import MarketplacePage from '@/pages/MarketplacePage'
 import MarketplaceListingPage from '@/pages/MarketplaceListingPage'
 import MarketplaceSubmitPage from '@/pages/MarketplaceSubmitPage'
 import MarketplaceAdminPage from '@/pages/MarketplaceAdminPage'
+import MarketplaceEarningsPage from '@/pages/MarketplaceEarningsPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import GuestRoute from '@/components/GuestRoute'
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/marketplace/submit" element={<MarketplaceSubmitPage />} />
           <Route path="/marketplace/admin" element={<MarketplaceAdminPage />} />
+          <Route path="/marketplace/earnings" element={<MarketplaceEarningsPage />} />
           <Route path="/marketplace/:id" element={<MarketplaceListingPage />} />
         </Route>
 
