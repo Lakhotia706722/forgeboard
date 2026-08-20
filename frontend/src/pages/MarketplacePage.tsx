@@ -94,6 +94,8 @@ export default function MarketplacePage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const activeWorkspace = useAuthStore((s) => s.activeWorkspace)()
+  const user = useAuthStore((s) => s.user)
+  const myRole = activeWorkspace?.role
 
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -162,6 +164,20 @@ export default function MarketplacePage() {
           >
             Submit a listing
           </button>
+          <button
+            onClick={() => navigate('/marketplace/earnings')}
+            className="text-xs text-gray-500 hover:text-gray-300 border border-gray-700 hover:border-gray-500 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            My earnings
+          </button>
+          {(myRole === 'owner' || myRole === 'admin') && (
+            <button
+              onClick={() => navigate('/marketplace/admin')}
+              className="text-xs text-gray-500 hover:text-gray-300 border border-gray-700 hover:border-gray-500 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Review queue
+            </button>
+          )}
         </div>
 
         {/* No active workspace warning */}
