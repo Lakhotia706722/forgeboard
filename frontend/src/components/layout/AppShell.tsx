@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Building2, Cpu, LayoutDashboard, LogOut, Phone, Plug, Settings, Shield } from 'lucide-react'
+import { Building2, Cpu, LayoutDashboard, LogOut, Phone, Plug, Settings, Shield, Store } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import { useAuthStore } from '@/store/authStore'
@@ -16,6 +16,7 @@ interface AppShellProps {
 const BASE_NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/board', label: 'Agents', icon: Cpu },
+  { to: '/marketplace', label: 'Marketplace', icon: Store },
   { to: '/connectors', label: 'Connectors', icon: Plug },
   { to: '/voice', label: 'Voice', icon: Phone },
   { to: '/governance', label: 'Governance', icon: Shield },
