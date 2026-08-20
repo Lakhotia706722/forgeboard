@@ -10,6 +10,7 @@ import VoicePage from '@/pages/VoicePage'
 import WorkspaceSettingsPage from '@/pages/WorkspaceSettingsPage'
 import AgencyDashboardPage from '@/pages/AgencyDashboardPage'
 import MarketplacePage from '@/pages/MarketplacePage'
+import MarketplaceListingPage from '@/pages/MarketplaceListingPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import GuestRoute from '@/components/GuestRoute'
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/settings" element={<WorkspaceSettingsPage />} />
           <Route path="/agency" element={<AgencyDashboardPage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/marketplace/:id" element={<MarketplaceListingPage />} />
         </Route>
 
         {/* Redirects */}
