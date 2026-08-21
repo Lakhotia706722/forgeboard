@@ -8,11 +8,12 @@ White-label branding endpoints — Phase 9d.
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Request
 
 from app.api.deps import CurrentUser, CurrentWorkspace, DB
 from app.schemas.branding import BrandingOut, BrandingUpdate
 from app.services import branding_service
+from app.services.platform_audit_service import log_event
 
 router = APIRouter()
 
@@ -29,12 +30,31 @@ async def update_branding(
     workspace: CurrentWorkspace,
     user: CurrentUser,
     db: DB,
+    request: Request,
 ):
-    """
-    Update white-label branding for this workspace.
-    Allowed for: workspace owner, admin, or the assigned managing agency user.
-    """
+    before = await branding_service.get_branding(workspace.id, db)
     result = await branding_service.update_branding(workspace.id, user.id, body, db)
+    await log_event(
+        db=db,
+        event_type="settings.branding_updated",
+        workspace_id=workspace.id,
+        actor_user_id=user.id,
+        actor_email=user.email,
+        actor_name=user.full_name,
+        resource_type="workspace",
+        resource_id=workspace.id,
+        before_state={
+            "brand_logo_url": before.brand_logo_url,
+            "brand_primary_color": before.brand_primary_color,
+            "brand_app_name": before.brand_app_name,
+        },
+        after_state={
+            "brand_logo_url": result.brand_logo_url,
+            "brand_primary_color": result.brand_primary_color,
+            "brand_app_name": result.brand_app_name,
+        },
+        request=request,
+    )
     await db.commit()
     return result
 

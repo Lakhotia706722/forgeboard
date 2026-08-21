@@ -9,11 +9,12 @@ Governance endpoints:
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import PlainTextResponse, Response
 
-from app.api.deps import CurrentWorkspace, DB, require_role
+from app.api.deps import CurrentUser, CurrentWorkspace, DB, require_role
 from app.services import governance_service
+from app.services.platform_audit_service import log_event
 
 router = APIRouter()
 
@@ -87,7 +88,9 @@ async def get_spend(workspace: CurrentWorkspace, db: DB):
 async def update_spend_cap(
     _: Annotated[None, _ADMIN_UP],
     workspace: CurrentWorkspace,
+    user: CurrentUser,
     db: DB,
+    request: Request,
     cap_usd_cents: int = Query(
         ...,
         ge=0,
@@ -95,10 +98,113 @@ async def update_spend_cap(
     ),
 ):
     """Update the hard spend cap. Requires admin or owner."""
-    return await governance_service.update_spend_cap(workspace.id, cap_usd_cents, db)
+    before = await governance_service.get_workspace_spend(workspace.id, db)
+    result = await governance_service.update_spend_cap(workspace.id, cap_usd_cents, db)
+    await log_event(
+        db=db,
+        event_type="settings.spend_cap_changed",
+        workspace_id=workspace.id,
+        actor_user_id=user.id,
+        actor_email=user.email,
+        actor_name=user.full_name,
+        resource_type="workspace",
+        resource_id=workspace.id,
+        before_state={"spend_cap_usd_cents": before["spend_cap_usd_cents"]},
+        after_state={"spend_cap_usd_cents": cap_usd_cents},
+        request=request,
+    )
+    return result
 
 
 @router.get("/pending-approvals")
 async def list_pending_approvals(workspace: CurrentWorkspace, db: DB):
     """Return agents with requires_approval=True that have active runs."""
     return await governance_service.list_pending_approvals(workspace.id, db)
+
+
+# ---------------------------------------------------------------------------
+# Platform audit log — Phase 11a
+# ---------------------------------------------------------------------------
+
+@router.get("/platform-audit")
+async def list_platform_audit(
+    workspace: CurrentWorkspace,
+    db: DB,
+    event_type: Optional[str] = Query(default=None),
+    limit: int = Query(default=200, le=2000),
+    offset: int = Query(default=0, ge=0),
+):
+    """
+    Query the platform-wide audit log for this workspace.
+    Covers membership changes, settings updates, marketplace events, etc.
+    Visible to all workspace roles.
+    """
+    from sqlalchemy import select
+    from app.models.platform_audit import PlatformAuditLog
+
+    q = select(PlatformAuditLog).where(
+        PlatformAuditLog.workspace_id == workspace.id
+    )
+    if event_type:
+        q = q.where(PlatformAuditLog.event_type == event_type)
+    q = q.order_by(PlatformAuditLog.created_at.desc()).limit(limit).offset(offset)
+
+    result = await db.execute(q)
+    entries = result.scalars().all()
+    return [
+        {
+            "id": str(e.id),
+            "event_type": e.event_type,
+            "actor_email": e.actor_email,
+            "actor_name": e.actor_name,
+            "resource_type": e.resource_type,
+            "resource_id": str(e.resource_id) if e.resource_id else None,
+            "before_state": e.before_state,
+            "after_state": e.after_state,
+            "ip_address": e.ip_address,
+            "created_at": e.created_at.isoformat(),
+        }
+        for e in entries
+    ]
+
+
+@router.get("/platform-audit/export")
+async def export_platform_audit(
+    _: Annotated[None, _ADMIN_UP],
+    workspace: CurrentWorkspace,
+    db: DB,
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    limit: int = Query(default=5000, le=50000),
+):
+    """
+    Export the full platform audit log. Requires admin or owner.
+    Supports JSON and CSV formats.
+    """
+    from sqlalchemy import select
+    from app.models.platform_audit import PlatformAuditLog
+    from app.services.platform_audit_service import (
+        export_platform_audit_csv,
+        export_platform_audit_json,
+    )
+
+    result = await db.execute(
+        select(PlatformAuditLog)
+        .where(PlatformAuditLog.workspace_id == workspace.id)
+        .order_by(PlatformAuditLog.created_at.desc())
+        .limit(limit)
+    )
+    entries = list(result.scalars().all())
+
+    if format == "csv":
+        content = export_platform_audit_csv(entries)
+        return PlainTextResponse(
+            content=content,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=platform_audit.csv"},
+        )
+    content = export_platform_audit_json(entries)
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=platform_audit.json"},
+    )

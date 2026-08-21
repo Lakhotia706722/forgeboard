@@ -18,7 +18,7 @@ Admin review queue [admin, owner]:
 """
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Annotated, Optional
 
@@ -31,6 +31,7 @@ from app.schemas.marketplace import (
     ReviewAction,
 )
 from app.services import marketplace_service
+from app.services.platform_audit_service import log_event
 from app.models.marketplace import ListingType
 
 router = APIRouter()
@@ -100,13 +101,28 @@ async def get_listing(listing_id: uuid.UUID, db: DB):
 async def install_listing(
     listing_id: uuid.UUID,
     workspace: CurrentWorkspace,
+    user: CurrentUser,
     db: DB,
+    request: Request,
 ):
-    """
-    Install a marketplace listing into the active workspace.
-    Creates an Agent (Draft) or Connector (PendingAuth) as an independent copy.
-    """
     result = await marketplace_service.install_listing(listing_id, workspace.id, db)
+    await log_event(
+        db=db,
+        event_type="marketplace.installed",
+        workspace_id=workspace.id,
+        actor_user_id=user.id,
+        actor_email=user.email,
+        actor_name=user.full_name,
+        resource_type="marketplace_listing",
+        resource_id=listing_id,
+        after_state={
+            "listing_name": result.listing_name,
+            "installed_type": result.installed_type.value,
+            "agent_id": str(result.agent_id) if result.agent_id else None,
+            "connector_id": str(result.connector_id) if result.connector_id else None,
+        },
+        request=request,
+    )
     await db.commit()
     return result
 
@@ -120,18 +136,21 @@ async def submit_listing(
     body: ListingSubmit,
     user: CurrentUser,
     db: DB,
+    request: Request,
 ):
-    """
-    Submit a new listing for admin review.
-
-    The config payload is scanned for credential-like content before entering
-    the review queue. Returns 422 if credentials are detected.
-    """
     result = await marketplace_service.submit_listing(
-        data=body,
-        author_user_id=user.id,
-        author_name=user.full_name,
+        data=body, author_user_id=user.id, author_name=user.full_name, db=db,
+    )
+    await log_event(
         db=db,
+        event_type="marketplace.submitted",
+        actor_user_id=user.id,
+        actor_email=user.email,
+        actor_name=user.full_name,
+        resource_type="marketplace_listing",
+        resource_id=result.id,
+        after_state={"name": result.name, "category": result.category, "listing_type": result.listing_type.value},
+        request=request,
     )
     await db.commit()
     return result
@@ -157,17 +176,21 @@ async def review_listing(
     _: Annotated[None, require_role("owner", "admin")],
     user: CurrentUser,
     db: DB,
+    request: Request,
 ):
-    """
-    Approve or reject a pending listing.
-    Rejected listings notify the submitter with the review note.
-    Requires owner or admin role.
-    """
     result = await marketplace_service.review_listing(
-        listing_id=listing_id,
-        reviewer_user_id=user.id,
-        action=body,
+        listing_id=listing_id, reviewer_user_id=user.id, action=body, db=db,
+    )
+    await log_event(
         db=db,
+        event_type=f"marketplace.{'approved' if body.action == 'approve' else 'rejected'}",
+        actor_user_id=user.id,
+        actor_email=user.email,
+        actor_name=user.full_name,
+        resource_type="marketplace_listing",
+        resource_id=listing_id,
+        after_state={"status": result.status.value, "review_note": body.note},
+        request=request,
     )
     await db.commit()
     return result
