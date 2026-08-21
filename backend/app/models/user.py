@@ -112,6 +112,10 @@ class Workspace(Base):
     brand_logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     brand_primary_color: Mapped[str | None] = mapped_column(String(7), nullable=True)  # hex e.g. "#6366f1"
     brand_app_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Audit log retention (Phase 11a) — days to keep platform_audit_log entries
+    # Default 365 = 1 year. Enterprise customers often need 3–7 years (see docs).
+    audit_retention_days: Mapped[int] = mapped_column(default=365, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
